@@ -9,11 +9,9 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Open ProfileActivity automatically
         Intent intent = new Intent(this, ProfileActivity.class);
         startActivity(intent);
 
-        // Close MainActivity so it doesn't stay in the back
         finish();
     }
 }
