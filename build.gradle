@@ -4,10 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        // Google Services plugin (latest stable is 4.4.2 but 4.4.0 also works)
         classpath 'com.google.gms:google-services:4.4.2'
-
-        // (optional) Crashlytics Gradle plugin
         classpath 'com.google.firebase:firebase-crashlytics-gradle:2.9.9'
     }
 }
@@ -15,4 +12,5 @@ buildscript {
 plugins {
     alias(libs.plugins.android.application) apply false
 }
+
 
