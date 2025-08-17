@@ -21,7 +21,7 @@ public class TrackingActivity extends AppCompatActivity {
             startActivity(intent);
         });
 
-        //  Activity Feed RecyclerView
+        // Activity Feed RecyclerView
         RecyclerView activityFeedRecycler = findViewById(R.id.activity_feed_recycler);
         activityFeedRecycler.setLayoutManager(new LinearLayoutManager(this));
 
@@ -38,12 +38,14 @@ public class TrackingActivity extends AppCompatActivity {
 
         Button fullOverviewButton = findViewById(R.id.full_overview_button);
         fullOverviewButton.setOnClickListener(v -> {
-
+            // You can add navigation here later
         });
 
+        // ✅ FIXED: "Find Groups" button now opens FindGroupsActivity
         Button findGroupsButton = findViewById(R.id.find_groups_button);
         findGroupsButton.setOnClickListener(v -> {
-
+            Intent intent = new Intent(TrackingActivity.this, com.example.joggrapp.ui.profile.FindGroupsActivity.class);
+            startActivity(intent);
         });
 
         // Suggested Groups RecyclerView

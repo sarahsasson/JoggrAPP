@@ -1,7 +1,11 @@
 plugins {
     alias(libs.plugins.android.application)
+<<<<<<< HEAD
     id 'com.google.gms.google-services'
     id 'com.google.firebase.crashlytics'
+=======
+    alias(libs.plugins.kotlin.android)
+>>>>>>> 4fa51ce (Edit Profile page with location services switch)
 }
 
 android {
@@ -23,13 +27,19 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+
+    // Keep Java 11 to match your current project
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
         targetCompatibility JavaVersion.VERSION_11
     }
+    kotlinOptions {
+        jvmTarget = '11'
+    }
 }
 
 dependencies {
+<<<<<<< HEAD
     implementation libs.appcompat
     implementation libs.material
     implementation libs.activity
@@ -48,4 +58,19 @@ dependencies {
 
     // Google Sign-In
     implementation 'com.google.android.gms:play-services-auth:21.2.0'
+=======
+    // ---- Core (pinned to stay compatible with AGP 8.7.3 / compileSdk 35)
+    implementation 'androidx.core:core:1.12.0'
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0'
+    implementation 'androidx.activity:activity:1.9.2'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.recyclerview:recyclerview:1.2.1'
+    implementation 'com.google.android.gms:play-services-location:21.0.1'
+    // ---- Testing
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+>>>>>>> 4fa51ce (Edit Profile page with location services switch)
 }
