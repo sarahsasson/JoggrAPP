@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">JoggrAPP</string>
+
+    <!-- Web client (auto-created by Firebase). Used for .requestIdToken(...) -->
+    <string name="default_web_client_id">
+        185851897257-r58lcrvj70aiemogm16hhuli5lo3reui.apps.googleusercontent.com
+    </string>
 </resources>

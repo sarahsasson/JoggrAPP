@@ -7,7 +7,6 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Looper;
 import android.provider.Settings;
-import android.util.Log;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -29,18 +28,13 @@ import java.util.Map;
 
 public class EditProfileActivity extends AppCompatActivity {
 
-    private static final String TAG = "EditProfile";
-    private static final String PREFS = "user_prefs";
-    private static final String KEY_USE_LOCATION = "use_location";
-
     private Switch locationSwitch;
     private TextView statusText;
 
-    // Fused Location
+    // Location
     private FusedLocationProviderClient fusedClient;
-    private LocationRequest locationRequest;
     private LocationCallback locationCallback;
-    private boolean requestingUpdates = false;
+    private LocationRequest locationRequest;
 
     private ActivityResultLauncher<String[]> permissionLauncher;
 
@@ -49,21 +43,22 @@ public class EditProfileActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_edit_profile);
 
-        // Back arrow in ActionBar
+        // Enable default back arrow if your theme shows an ActionBar
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setDisplayShowHomeEnabled(true);
-            getSupportActionBar().setTitle("Edit Profile");
         }
 
         locationSwitch = findViewById(R.id.switch_location);
         statusText = findViewById(R.id.tv_location_status);
 
-        // --- Fused location setup ---
+        // --- Fused Location setup ---
         fusedClient = LocationServices.getFusedLocationProviderClient(this);
-        locationRequest = new LocationRequest.Builder(10_000) // 10s
-                .setMinUpdateIntervalMillis(5_000)            // 5s min
-                .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
+
+        // Request ~10s updates (balanced power)
+        locationRequest = new LocationRequest.Builder(
+                /* intervalMillis = */ 10_000L)
+                .setMinUpdateIntervalMillis(5_000L)
+                .setPriority(Priority.PRIORITY_BALANCED_POWER_ACCURACY)
                 .build();
 
         locationCallback = new LocationCallback() {
@@ -72,65 +67,70 @@ public class EditProfileActivity extends AppCompatActivity {
                 if (result == null || result.getLastLocation() == null) return;
                 double lat = result.getLastLocation().getLatitude();
                 double lon = result.getLastLocation().getLongitude();
-                Log.d(TAG, "Location: " + lat + "," + lon);
-                // Keep UI simple for now; we just log updates.
+                statusText.setText("Location: " + String.format("%.5f, %.5f", lat, lon));
             }
         };
 
         // Permission launcher
         permissionLauncher = registerForActivityResult(
                 new ActivityResultContracts.RequestMultiplePermissions(),
-                (Map<String, Boolean> result) -> {
+                (Map<String, Boolean> res) -> {
                     boolean granted =
-                            Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_FINE_LOCATION)) ||
-                                    Boolean.TRUE.equals(result.get(Manifest.permission.ACCESS_COARSE_LOCATION));
-                    getSharedPreferences(PREFS, MODE_PRIVATE)
-                            .edit().putBoolean(KEY_USE_LOCATION, granted).apply();
+                            Boolean.TRUE.equals(res.get(Manifest.permission.ACCESS_FINE_LOCATION)) ||
+                                    Boolean.TRUE.equals(res.get(Manifest.permission.ACCESS_COARSE_LOCATION));
+
+                    // Persist user preference (whether they want location ON)
+                    getSharedPreferences("user_prefs", MODE_PRIVATE)
+                            .edit().putBoolean("use_location", granted).apply();
+
                     if (!granted) {
                         Toast.makeText(this, "Location permission denied", Toast.LENGTH_SHORT).show();
                     }
-                    updateUiAndMaybeToggleUpdates();
+                    updateUi(); // will start/stop updates as needed
                 });
 
-        // Switch behavior: save preference, then start/stop updates as needed
-        locationSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            getSharedPreferences(PREFS, MODE_PRIVATE)
-                    .edit().putBoolean(KEY_USE_LOCATION, isChecked).apply();
-
+        // Switch listener
+        locationSwitch.setOnCheckedChangeListener((btn, isChecked) -> {
             if (isChecked) {
+                // User wants it ON → ensure permission then start updates
                 if (!hasLocationPermission()) {
                     permissionLauncher.launch(new String[]{
                             Manifest.permission.ACCESS_FINE_LOCATION,
                             Manifest.permission.ACCESS_COARSE_LOCATION
                     });
                 } else {
-                    startLocationUpdatesIfNeeded();
+                    getSharedPreferences("user_prefs", MODE_PRIVATE)
+                            .edit().putBoolean("use_location", true).apply();
+                    startLocationUpdates();
+                    updateUi();
                 }
             } else {
-                stopLocationUpdatesIfRunning();
-                openAppSettingsToManagePermission(); // optional prompt
+                // User toggled OFF → stop updates (and keep permission as-is)
+                getSharedPreferences("user_prefs", MODE_PRIVATE)
+                        .edit().putBoolean("use_location", false).apply();
+                stopLocationUpdates();
+                statusText.setText("Location is OFF");
             }
-            updateUiAndMaybeToggleUpdates();
         });
     }
 
     @Override
-    protected void onResume() {
-        super.onResume();
-        updateUiAndMaybeToggleUpdates(); // resume updates if user wants & permission granted
+    protected void onStart() {
+        super.onStart();
+        // If user wants location and permission is granted, (re)start updates
+        boolean wants = getSharedPreferences("user_prefs", MODE_PRIVATE)
+                .getBoolean("use_location", false);
+        if (wants && hasLocationPermission()) {
+            startLocationUpdates();
+        }
+        updateUi();
     }
 
     @Override
-    protected void onPause() {
-        super.onPause();
-        // Simple version: only track while this screen is visible
-        stopLocationUpdatesIfRunning();
-    }
-
-    // ----- Helpers -----
-
-    private boolean userWantsLocation() {
-        return getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(KEY_USE_LOCATION, false);
+    protected void onStop() {
+        super.onStop();
+        // Be polite with battery: stop when screen not visible
+        stopLocationUpdates();
     }
 
     private boolean hasLocationPermission() {
@@ -141,24 +141,21 @@ public class EditProfileActivity extends AppCompatActivity {
         return fine || coarse;
     }
 
-    private void startLocationUpdatesIfNeeded() {
-        if (requestingUpdates) return;
-        if (!userWantsLocation() || !hasLocationPermission()) return;
+    private void startLocationUpdates() {
+        if (!hasLocationPermission()) return;
+        fusedClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper());
 
-        fusedClient.requestLocationUpdates(
-                locationRequest,
-                locationCallback,
-                Looper.getMainLooper()
-        );
-        requestingUpdates = true;
-        Log.d(TAG, "Started location updates");
+        // Also try a quick “last location” to show something immediately
+        fusedClient.getLastLocation().addOnSuccessListener(loc -> {
+            if (loc != null) {
+                statusText.setText("Location: " +
+                        String.format("%.5f, %.5f", loc.getLatitude(), loc.getLongitude()));
+            }
+        });
     }
 
-    private void stopLocationUpdatesIfRunning() {
-        if (!requestingUpdates) return;
+    private void stopLocationUpdates() {
         fusedClient.removeLocationUpdates(locationCallback);
-        requestingUpdates = false;
-        Log.d(TAG, "Stopped location updates");
     }
 
     private void openAppSettingsToManagePermission() {
@@ -168,18 +165,17 @@ public class EditProfileActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
-    private void updateUiAndMaybeToggleUpdates() {
-        boolean wants = userWantsLocation();
+    private void updateUi() {
+        boolean wantsLocation = getSharedPreferences("user_prefs", MODE_PRIVATE)
+                .getBoolean("use_location", false);
         boolean hasPerm = hasLocationPermission();
-        boolean effectiveOn = wants && hasPerm;
+        boolean effectiveOn = wantsLocation && hasPerm;
 
-        // Keep the switch reflecting the effective state
-        if (locationSwitch.isChecked() != wants) {
+        // Keep switch in sync without retriggering listener loops
+        if (locationSwitch.isChecked() != effectiveOn) {
             locationSwitch.setOnCheckedChangeListener(null);
-            locationSwitch.setChecked(wants);
+            locationSwitch.setChecked(effectiveOn);
             locationSwitch.setOnCheckedChangeListener((btn, isChecked) -> {
-                getSharedPreferences(PREFS, MODE_PRIVATE)
-                        .edit().putBoolean(KEY_USE_LOCATION, isChecked).apply();
                 if (isChecked) {
                     if (!hasLocationPermission()) {
                         permissionLauncher.launch(new String[]{
@@ -187,28 +183,30 @@ public class EditProfileActivity extends AppCompatActivity {
                                 Manifest.permission.ACCESS_COARSE_LOCATION
                         });
                     } else {
-                        startLocationUpdatesIfNeeded();
+                        getSharedPreferences("user_prefs", MODE_PRIVATE)
+                                .edit().putBoolean("use_location", true).apply();
+                        startLocationUpdates();
+                        updateUi();
                     }
                 } else {
-                    stopLocationUpdatesIfRunning();
-                    openAppSettingsToManagePermission();
+                    getSharedPreferences("user_prefs", MODE_PRIVATE)
+                            .edit().putBoolean("use_location", false).apply();
+                    stopLocationUpdates();
+                    statusText.setText("Location is OFF");
                 }
-                updateUiAndMaybeToggleUpdates();
             });
         }
 
-        statusText.setText(
-                effectiveOn ? "Location is ON"
-                        : wants && !hasPerm ? "Location ON in app, but OS permission is missing"
-                        : "Location is OFF"
-        );
-
-        // Start/stop based on effective state
-        if (effectiveOn) startLocationUpdatesIfNeeded();
-        else stopLocationUpdatesIfRunning();
+        if (effectiveOn) {
+            // If updates are running, text will show coordinates from callback
+            if (!hasPerm) statusText.setText("Location ON (no permission?)");
+        } else if (wantsLocation && !hasPerm) {
+            statusText.setText("Location ON in app, but OS permission missing");
+        } else {
+            statusText.setText("Location is OFF");
+        }
     }
 
-    // Back arrow
     @Override
     public boolean onSupportNavigateUp() {
         onBackPressed();
