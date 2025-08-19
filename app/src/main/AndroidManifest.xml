@@ -2,9 +2,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-<uses-feature android:name="android.hardware.location.gps" android:required="false"/>
+    <!-- Location (already present) -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-feature
+        android:name="android.hardware.location.gps"
+        android:required="false" />
+
+    <!-- Needed for Google Sign-In / Firebase -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="true"
@@ -17,20 +23,39 @@
         android:theme="@style/Theme.JoggrAPP"
         tools:targetApi="31">
 
-        <!-- ✅ Main Activity (Home Screen) -->
+        <!-- Sign-In is now launcher -->
         <activity
-            android:name=".ProfileActivity"
-            android:exported="true">
+            android:name=".SignInActivity"
+            android:exported="true"
+            android:label="Sign In">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
-        <!-- ✅ Added TrackingActivity -->
-        <activity android:name=".TrackingActivity"
-            android:exported="true"/> <!-- Ensures it can be opened -->
+        <!-- Profile (navigated to after login) -->
+        <activity
+            android:name=".ProfileActivity"
+            android:exported="true" />
 
+        <!-- Edit Profile (Up goes back to Profile) -->
+        <activity
+            android:name=".ui.profile.EditProfileActivity"
+            android:exported="false"
+            android:label="Edit Profile"
+            android:parentActivityName=".ProfileActivity" />
+
+        <!-- Find Groups -->
+        <activity
+            android:name=".ui.profile.FindGroupsActivity"
+            android:exported="false"
+            android:label="Find Groups" />
+
+        <!-- Tracking -->
+        <activity
+            android:name=".TrackingActivity"
+            android:exported="true" />
     </application>
 
 </manifest>
